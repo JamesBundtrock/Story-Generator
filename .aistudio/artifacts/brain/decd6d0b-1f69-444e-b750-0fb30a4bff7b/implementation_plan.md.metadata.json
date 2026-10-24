@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan to fix the npm peer dependency conflict (ERESOLVE) by removing the conflicting explicit esbuild version in package.json and adding --legacy-peer-deps to the GitHub Actions install step.",
-  "updatedAt":  "2026-10-23T23:55:02.527355254Z",
+  "summary":  "Implementation plan explaining the static GitHub Pages vs browser storage architecture, and adding 1-click Download Category File (.ts) buttons to the Category Manager.",
+  "updatedAt":  "2026-10-24T02:45:30.606831588Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -124,31 +124,33 @@ export const CategoryLibraryModal: React.FC<CategoryLibraryModalProps> = ({
     setTimeout(() => setStatusMessage(null), 3000);
   };
 
-  // Generate the clean TypeScript file content for this specific category
-  const getCategoryTypeScriptCode = () => {
-    const varName = `${activeTab}Items`;
-    const formattedArray = currentItems
+  // Generate the clean TypeScript file content for a specific category
+  const getCategoryTypeScriptCode = (targetCat: CategoryId = activeTab) => {
+    const cat = CATEGORIES.find(c => c.id === targetCat) || currentCategory;
+    const items = pools[targetCat] || [];
+    const varName = `${targetCat}Items`;
+    const formattedArray = items
       .map(item => `  ${JSON.stringify(item)},`)
       .join('\n');
 
     return `import { CategoryConfig } from './types';
 
 /**
- * Category ${currentCategory.index}: ${currentCategory.label}
- * Target File: /src/data/categories/${activeTab}.ts
+ * Category ${cat.index}: ${cat.label}
+ * Target File: /src/data/categories/${targetCat}.ts
  */
 export const ${varName}: string[] = [
 ${formattedArray}
 ];
 
-export const ${activeTab}Category: CategoryConfig = {
-  id: '${activeTab}',
-  index: ${currentCategory.index},
-  label: '${currentCategory.label}',
-  subtitle: '${currentCategory.subtitle}',
-  shortName: '${currentCategory.shortName}',
-  description: '${currentCategory.description}',
-  icon: '${currentCategory.icon}',
+export const ${targetCat}Category: CategoryConfig = {
+  id: '${targetCat}',
+  index: ${cat.index},
+  label: '${cat.label}',
+  subtitle: '${cat.subtitle}',
+  shortName: '${cat.shortName}',
+  description: '${cat.description}',
+  icon: '${cat.icon}',
   items: ${varName},
 };
 
@@ -156,8 +158,31 @@ export default ${varName};
 `;
   };
 
+  const handleDownloadCategoryFile = (catId: CategoryId = activeTab) => {
+    const code = getCategoryTypeScriptCode(catId);
+    const blob = new Blob([code], { type: 'text/typescript;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${catId}.ts`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${catId}.ts (${pools[catId]?.length || 0} options)`);
+  };
+
+  const handleDownloadAllFiles = () => {
+    (['world', 'role', 'women', 'dynamic', 'taboo'] as CategoryId[]).forEach((catId, idx) => {
+      setTimeout(() => {
+        handleDownloadCategoryFile(catId);
+      }, idx * 250);
+    });
+    showToast('Downloaded all 5 category .ts files!');
+  };
+
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(getCategoryTypeScriptCode());
+    navigator.clipboard.writeText(getCategoryTypeScriptCode(activeTab));
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
@@ -268,6 +293,15 @@ export default ${varName};
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => handleDownloadCategoryFile(activeTab)}
+                title={`Download ${activeTab}.ts directly to your computer to commit to GitHub`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-red-950/50 hover:bg-red-900/70 border border-red-800 text-red-200 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-red-400" />
+                <span>Download {activeTab}.ts</span>
+              </button>
+
+              <button
                 onClick={() => setViewCodeMode(!viewCodeMode)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer ${
                   viewCodeMode
@@ -298,20 +332,29 @@ export default ${varName};
           {viewCodeMode ? (
             /* Code View for the specific file */
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-zinc-400">
                   Ready-to-use TypeScript code for <code className="text-red-400 font-mono">/src/data/categories/{activeTab}.ts</code>:
                 </span>
-                <button
-                  onClick={handleCopyCode}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/60 hover:bg-red-900/80 border border-red-700 text-red-200 rounded text-xs transition-colors cursor-pointer"
-                >
-                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedCode ? 'Copied File Code!' : 'Copy Code to Clipboard'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDownloadCategoryFile(activeTab)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/60 hover:bg-red-900/80 border border-red-700 text-red-200 rounded text-xs transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-red-400" />
+                    <span>Download {activeTab}.ts</span>
+                  </button>
+                  <button
+                    onClick={handleCopyCode}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 rounded text-xs transition-colors cursor-pointer"
+                  >
+                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedCode ? 'Copied File Code!' : 'Copy Code'}</span>
+                  </button>
+                </div>
               </div>
               <pre className="bg-[#0b0b0d] border border-zinc-800 rounded-lg p-4 font-mono text-xs text-zinc-300 overflow-x-auto max-h-96 select-all">
-                {getCategoryTypeScriptCode()}
+                {getCategoryTypeScriptCode(activeTab)}
               </pre>
             </div>
           ) : (
@@ -464,7 +507,16 @@ export default ${varName};
 
           {/* Backup & Full Loadout Controls */}
           <div className="pt-4 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleDownloadAllFiles}
+                title="Download all 5 category files (world.ts, role.ts, women.ts, dynamic.ts, taboo.ts)"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-800/80 rounded text-red-200 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-red-400" />
+                <span>Download All 5 .ts Files</span>
+              </button>
+
               <button
                 onClick={handleCopyFullExport}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded text-zinc-300 transition-colors cursor-pointer"
