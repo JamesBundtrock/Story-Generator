@@ -1,74 +1,43 @@
-# Fix for GitHub Actions Missing Lockfile Error
+# Fix for npm ERESOLVE Peer Dependency Conflict
 
-Resolve the `Dependencies lock file is not found` error in GitHub Actions by updating the workflow to build without requiring a strict lockfile.
+Resolve the `npm error ERESOLVE could not resolve` failure in GitHub Actions caused by a version mismatch between `vite` and the explicit `esbuild` devDependency.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Difference Between the Two Approaches:**
->
-> 1. **Removing `cache: 'npm'` from the workflow (Recommended):**
->    - **How it works**: Removes the instruction that demands a `package-lock.json` before running.
->    - **Why it's better**: Your GitHub Action will run immediately and build reliably every time, without requiring you to generate or commit a 3,000+ line `package-lock.json` file to your Git repository. On GitHub's cloud runners, installing these lightweight dependencies takes only ~10 seconds.
->    - **Downside**: Each push downloads the dependencies fresh instead of caching them (a difference of only ~5-10 seconds per build).
->
-> 2. **Generating and Committing `package-lock.json`:**
->    - **How it works**: Creates a freeze of exact dependency versions and commits it to your GitHub repository.
->    - **Benefit**: Allows `actions/setup-node` to cache `~/.npm`, saving about 5 seconds during the install step.
->    - **Downside**: If you don't commit `package-lock.json` alongside `package.json`, the GitHub Action fails with the exact error you encountered.
->
-> **Recommended Solution:**
-> Remove `cache: 'npm'` in `.github/workflows/deploy.yml`. This guarantees the workflow succeeds without depending on any specific lockfile format.
+> **Cause of the Failure:**
+> `package.json` has `"esbuild": "^0.25.0"` listed under `devDependencies`.
+> However, `vite@8.3.5` requires `esbuild@"^0.27.0 || ^0.28.0"`.
+> In npm v7+, peer dependency conflicts trigger strict `ERESOLVE` errors during clean CI installations unless the conflict is eliminated or `--legacy-peer-deps` is passed.
+
+- **Solution 1 (Codebase)**: Remove `"esbuild": "^0.25.0"` from `package.json` `devDependencies`. Vite manages its own internal `esbuild` version and does not need it declared manually.
+- **Solution 2 (CI Resilience)**: Update `.github/workflows/deploy.yml` to run `npm install --legacy-peer-deps`. This guarantees that future minor dependency peer mismatches will never break CI builds.
 
 ---
 
 ## 1. Overview & Core Concept
 
-When GitHub Actions executes `actions/setup-node@v4` with `cache: 'npm'`, it searches the repository root for `package-lock.json`, `npm-shrinkwrap.json`, or `yarn.lock`. Because only `package.json` was committed, the action halts before installing dependencies.
-
-By removing the `cache: 'npm'` line:
-- `actions/setup-node@v4` configures Node 22 without failing on missing lockfiles.
-- `npm install` runs directly and fetches the dependencies from `package.json`.
-- `npm run build` generates the compiled files into `dist/`.
-- GitHub Pages deploys the live applet without errors.
+Clean CI environments like GitHub Actions install packages in a strictly isolated environment. By aligning `package.json` with Vite's bundled dependencies and configuring `--legacy-peer-deps` in the deployment workflow, `npm install` and `npm run build` will complete without errors.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Technical Architecture & Data Strategy
 
-- **Deployment Flow**: Once updated, triggering the workflow in the **Actions** tab on GitHub will turn green with a checkmark.
-- **Live Site**: `https://jamesbundtrock.github.io/Story-Generator/` will load the live scenario generator directly.
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Direct Workflow Fix**
-  - *Chosen Approach*: Update `.github/workflows/deploy.yml` to remove `cache: 'npm'`.
-  - *Why*: Solves the root cause with zero ongoing friction for future pushes.
-
----
-
-## 4. Technical Architecture & Data Strategy
-
-### Workflow Step Adjustment
+### Resolution Steps
 
 ```
-Current (Failing):
-  actions/setup-node@v4
-    with:
-      node-version: 22
-      cache: 'npm'   <── FAILS here: No package-lock.json found!
+Current State (Error):
+  package.json -> devDependencies: "esbuild": "^0.25.0"
+  vite@8.3.5   -> peerOptional: "esbuild": "^0.27.0 || ^0.28.0"
+  Result       -> ERESOLVE error in npm install
 
-Fixed (Succeeding):
-  actions/setup-node@v4
-    with:
-      node-version: 22
-  npm install        <── Installs from package.json cleanly
-  npm run build      <── Builds dist/
-  deploy-pages@v4    <── Publishes to GitHub Pages
+Fixed State (Success):
+  1. Remove explicit esbuild from package.json (Vite provides it)
+  2. Run `npm install --legacy-peer-deps` in .github/workflows/deploy.yml
+  Result       -> Clean installation & successful Vite production build
 ```
 
 ### Action Items
-1. Edit `/.github/workflows/deploy.yml`: Remove `cache: 'npm'`.
-2. Commit and push the updated workflow file to GitHub.
+1. **`package.json`**: Remove the redundant `"esbuild": "^0.25.0"` line from `devDependencies`.
+2. **`.github/workflows/deploy.yml`**: Update `run: npm install` to `run: npm install --legacy-peer-deps`.
+3. Verify local compilation with `compile_applet`.

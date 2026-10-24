@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan explaining the difference between workflow-level cache removal and committing a lockfile, with the recommended strategy to ensure GitHub Actions succeeds seamlessly.",
-  "updatedAt":  "2026-10-23T23:51:40.275178020Z",
+  "summary":  "Plan to fix the npm peer dependency conflict (ERESOLVE) by removing the conflicting explicit esbuild version in package.json and adding --legacy-peer-deps to the GitHub Actions install step.",
+  "updatedAt":  "2026-10-23T23:55:02.527355254Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
